@@ -1,9 +1,10 @@
 package agent
 
 import (
-	"errors"
 	"fmt"
 	"github.com/halviet/metrics/internal/storage"
+	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"runtime"
@@ -30,7 +31,7 @@ func (a *Agent) Update() {
 }
 
 func (a *Agent) Send() error {
-	baseUrl := "http://localhost:8080/update/"
+	baseURL := "http://localhost:8080/update/"
 	metrics := make(map[string]string)
 
 	metrics["Alloc"] = strconv.FormatUint(a.MemStats.Alloc, 10)
@@ -62,14 +63,19 @@ func (a *Agent) Send() error {
 	metrics["TotalAlloc"] = strconv.FormatUint(a.MemStats.TotalAlloc, 10)
 
 	sendMetric := func(metricType, name, v string) error {
-		resp, err := http.Post(baseUrl+fmt.Sprintf("%q/%q/%q", metricType, name, v), "text/plain", nil)
+		resp, err := http.Post(baseURL+fmt.Sprintf("%q/%q/%q", metricType, name, v), "text/plain", nil)
 		if err != nil {
 			return err
 		}
-		defer resp.Body.Close()
+		defer func(Body io.ReadCloser) {
+			err := Body.Close()
+			if err != nil {
+				log.Fatal("Closing body err:", err)
+			}
+		}(resp.Body)
 
 		if resp.StatusCode != 200 {
-			return errors.New(fmt.Sprintf("Request failed, server sent %d status code", resp.StatusCode))
+			return fmt.Errorf("request failed, server sent %d status code", resp.StatusCode)
 		}
 
 		return nil
@@ -115,10 +121,6 @@ func (a *Agent) Start(pollInterval, reportInterval time.Duration) error {
 		}
 	}()
 
-	for {
-		select {
-		case s := <-sender:
-			return s
-		}
-	}
+	s := <-sender
+	return s
 }
