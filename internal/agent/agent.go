@@ -3,8 +3,6 @@ package agent
 import (
 	"fmt"
 	"github.com/halviet/metrics/internal/storage"
-	"io"
-	"log"
 	"math/rand"
 	"net/http"
 	"runtime"
@@ -67,12 +65,10 @@ func (a *Agent) Send() error {
 		if err != nil {
 			return err
 		}
-		defer func(Body io.ReadCloser) {
-			err := Body.Close()
-			if err != nil {
-				log.Fatal("Closing body err:", err)
-			}
-		}(resp.Body)
+		err = resp.Body.Close()
+		if err != nil {
+			return err
+		}
 
 		if resp.StatusCode != 200 {
 			return fmt.Errorf("request failed, server sent %d status code", resp.StatusCode)

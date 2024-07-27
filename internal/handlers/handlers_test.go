@@ -100,6 +100,10 @@ func TestMetricHandler(t *testing.T) {
 			MetricHandler(store)(w, req)
 
 			res := w.Result()
+			err := res.Body.Close()
+			if err != nil {
+				t.Errorf("err on closing response body, err: %v", err)
+			}
 
 			if res.StatusCode != test.want.statusCode {
 				t.Errorf("invalid status code, got: %d, want %d", res.StatusCode, test.want.statusCode)
