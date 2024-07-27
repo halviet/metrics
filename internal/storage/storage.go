@@ -16,6 +16,14 @@ func (c *MetricCollection) UpdateCounter(v Counter) {
 	c.counter += v
 }
 
+func (c *MetricCollection) GetGauge() Gauge {
+	return c.gauge
+}
+
+func (c *MetricCollection) GetCounter() Counter {
+	return c.counter
+}
+
 type MemStorage struct {
 	Collection map[string]MetricCollection
 }
