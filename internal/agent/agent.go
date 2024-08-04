@@ -61,7 +61,7 @@ func (a *Agent) Send() error {
 	metrics["TotalAlloc"] = strconv.FormatUint(a.MemStats.TotalAlloc, 10)
 
 	sendMetric := func(metricType, name, v string) error {
-		resp, err := http.Post(baseURL+fmt.Sprintf("%q/%q/%q", metricType, name, v), "text/plain", nil)
+		resp, err := http.Post(baseURL+metricType+"/"+name+"/"+v, "text/plain", nil)
 		if err != nil {
 			return err
 		}

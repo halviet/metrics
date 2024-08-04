@@ -1,8 +1,10 @@
 package handlers
 
 import (
-	"fmt"
+	"github.com/go-chi/chi/v5"
 	"github.com/halviet/metrics/internal/storage"
+	"github.com/stretchr/testify/assert"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -88,40 +90,117 @@ func TestMetricHandler(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			target := fmt.Sprintf("/update/%q/%q/%q", test.metricType, test.metricName, test.metricValue)
-			req := httptest.NewRequest(http.MethodPost, target, nil)
-			req.SetPathValue("metricType", test.metricType)
-			req.SetPathValue("metricName", test.metricName)
-			req.SetPathValue("metricValue", test.metricValue)
-
-			w := httptest.NewRecorder()
-
 			store := storage.New()
-			MetricHandler(store)(w, req)
 
-			res := w.Result()
-			err := res.Body.Close()
-			if err != nil {
-				t.Errorf("err on closing response body, err: %v", err)
-			}
+			r := chi.NewRouter()
+			r.Post("/update/{metricType}/{metricName}/{metricValue}", MetricHandler(store))
 
-			if res.StatusCode != test.want.statusCode {
-				t.Errorf("invalid status code, got: %d, want %d", res.StatusCode, test.want.statusCode)
-			}
+			ts := httptest.NewServer(r)
+
+			target := ts.URL + "/update/" + test.metricType + "/" + test.metricName + "/" + test.metricValue
+			req, err := http.NewRequest(http.MethodPost, target, nil)
+			assert.NoError(t, err)
+
+			resp, err := ts.Client().Do(req)
+			assert.NoError(t, err)
+
+			err = resp.Body.Close()
+			assert.NoError(t, err)
+
+			assert.Equal(t, test.want.statusCode, resp.StatusCode)
 
 			if test.want.statusCode == http.StatusOK {
 				switch test.metricType {
 				case "gauge":
 					val, err := strconv.ParseFloat(test.metricValue, 64)
-					if err != nil {
-						t.Errorf("err on parsing metricValue: %q; err: %v", test.metricValue, err)
-					}
+					assert.NoError(t, err)
 
-					if store.GetGauge(test.metricName) != storage.Gauge(val) {
-						t.Errorf("value has been wrote wrong, got: %f; want: %f", store.GetGauge(test.metricName), storage.Gauge(val))
-					}
+					g, err := store.GetGauge(test.metricName)
+					assert.NoError(t, err)
+					assert.Equal(t, storage.Gauge(val), g)
+				case "counter":
+					val, err := strconv.ParseInt(test.metricValue, 10, 64)
+					assert.NoError(t, err)
 
+					c, err := store.GetCounter(test.metricName)
+					assert.NoError(t, err)
+					assert.Equal(t, storage.Counter(val), c)
 				}
+			}
+		})
+	}
+}
+
+func TestGetMetricHandle(t *testing.T) {
+	type want struct {
+		statusCode int
+		value      string
+	}
+
+	tests := []struct {
+		name       string
+		metricType string
+		metricName string
+		want       want
+	}{
+		{
+			"gauge value",
+			"gauge",
+			"gaugeValue",
+			want{
+				statusCode: http.StatusOK,
+				value:      "100.01",
+			},
+		},
+		{
+			"counter value",
+			"counter",
+			"counterValue",
+			want{
+				statusCode: http.StatusOK,
+				value:      "5",
+			},
+		},
+		{
+			"not existing gauge value",
+			"gauge",
+			"notExist",
+			want{statusCode: http.StatusNotFound},
+		},
+		{
+			"not existing counter value",
+			"counter",
+			"notExist",
+			want{statusCode: http.StatusNotFound},
+		},
+	}
+
+	store := storage.New()
+	store.UpdateGauge("gaugeValue", storage.Gauge(100.01))
+	store.UpdateCounter("counterValue", storage.Counter(5))
+
+	r := chi.NewRouter()
+	r.Get("/value/{metricType}/{metricName}", GetMetricHandle(store))
+
+	ts := httptest.NewServer(r)
+	defer ts.Close()
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			target := ts.URL + "/value/" + test.metricType + "/" + test.metricName
+			req, err := http.NewRequest(http.MethodGet, target, nil)
+			assert.NoError(t, err)
+
+			resp, err := ts.Client().Do(req)
+			assert.NoError(t, err)
+			defer resp.Body.Close()
+
+			assert.Equal(t, test.want.statusCode, resp.StatusCode)
+
+			if test.want.statusCode == http.StatusOK {
+				respBody, err := io.ReadAll(resp.Body)
+				assert.NoError(t, err)
+				assert.Equal(t, test.want.value, string(respBody))
 			}
 		})
 	}

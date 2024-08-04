@@ -1,5 +1,9 @@
 package storage
 
+import (
+	"errors"
+)
+
 type Gauge float64
 type Counter int64
 
@@ -59,10 +63,45 @@ func (m *MemStorage) UpdateCounter(name string, v Counter) {
 	m.Collection[name] = collection
 }
 
-func (m *MemStorage) GetGauge(name string) Gauge {
-	return m.Collection[name].gauge
+var ErrMetricNotFound = errors.New("metric not found")
+
+func (m *MemStorage) GetGauge(name string) (Gauge, error) {
+	g, ok := m.Collection[name]
+	if !ok {
+		return Gauge(0), ErrMetricNotFound
+	}
+
+	return g.gauge, nil
 }
 
-func (m *MemStorage) GetCounter(name string) Counter {
-	return m.Collection[name].counter
+func (m *MemStorage) GetCounter(name string) (Counter, error) {
+	c, ok := m.Collection[name]
+	if !ok {
+		return Counter(0), ErrMetricNotFound
+	}
+
+	return c.counter, nil
+}
+
+type ResultMetric struct {
+	Gauge   map[string]Gauge
+	Counter map[string]Counter
+}
+
+func (m *MemStorage) GetAllMetrics() ResultMetric {
+	res := ResultMetric{
+		Gauge:   map[string]Gauge{},
+		Counter: map[string]Counter{},
+	}
+
+	for name, collection := range m.Collection {
+		if val := collection.GetGauge(); val != Gauge(0) {
+			res.Gauge[name] = val
+		}
+		if val := collection.GetCounter(); val != Counter(0) {
+			res.Counter[name] = val
+		}
+	}
+
+	return res
 }
