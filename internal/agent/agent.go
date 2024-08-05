@@ -12,6 +12,7 @@ import (
 
 type Agent struct {
 	MemStats    runtime.MemStats
+	SrvAddr     string
 	PollCount   int64
 	RandomValue storage.Gauge
 }
@@ -29,7 +30,7 @@ func (a *Agent) Update() {
 }
 
 func (a *Agent) Send() error {
-	baseURL := "http://localhost:8080/update/"
+	baseURL := "http://" + a.SrvAddr + "/update/"
 	metrics := make(map[string]string)
 
 	metrics["Alloc"] = strconv.FormatUint(a.MemStats.Alloc, 10)
