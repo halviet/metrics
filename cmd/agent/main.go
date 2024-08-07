@@ -1,23 +1,20 @@
 package main
 
 import (
-	"flag"
 	"github.com/halviet/metrics/internal/agent"
 	"log"
-	"time"
 )
 
 func main() {
-	srvAddr := flag.String("a", "localhost:8080", "address of a metrics server (addr:port)")
-	reportInterval := flag.Int64("r", 10, "report interval, in seconds")
-	pollInterval := flag.Int64("p", 2, "poll interval, in seconds")
-
-	flag.Parse()
+	cfg, err := NewConfig()
+	if err != nil {
+		log.Fatalf("config initialization fail: %v", err)
+	}
 
 	a := agent.New()
-	a.SrvAddr = *srvAddr
+	a.SrvAddr = cfg.SrvAddr
 
-	if err := a.Start(time.Duration(*pollInterval)*time.Second, time.Duration(*reportInterval)*time.Second); err != nil {
+	if err := a.Start(cfg.PollInterval, cfg.ReportInterval); err != nil {
 		log.Fatal(err)
 	}
 }
