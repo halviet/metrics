@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	SrvAddr        string        `env:"ADDRESS"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
+	SrvAddr        string
+	PollInterval   time.Duration
+	ReportInterval time.Duration
 }
 
 func NewConfig() (Config, error) {
@@ -48,11 +48,20 @@ func parseFlags() Config {
 }
 
 func parseEnv() (Config, error) {
-	var cfg Config
+	var cfg struct {
+		SrvAddr        string `env:"ADDRESS"`
+		PollInterval   int    `env:"POLL_INTERVAL"`
+		ReportInterval int    `env:"REPORT_INTERVAL"`
+	}
+
 	err := env.Parse(&cfg)
 	if err != nil {
 		return Config{}, fmt.Errorf("parseEnv: %v", err)
 	}
 
-	return cfg, nil
+	return Config{
+		SrvAddr:        cfg.SrvAddr,
+		PollInterval:   time.Duration(cfg.PollInterval) * time.Second,
+		ReportInterval: time.Duration(cfg.ReportInterval) * time.Second,
+	}, nil
 }

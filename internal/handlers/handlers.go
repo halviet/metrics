@@ -66,9 +66,8 @@ func GetMetricHandle(store *storage.MemStorage) http.HandlerFunc {
 				return
 			}
 
-			w.Header().Set("Content-Type", "text/plain charset=UTF-8")
 			w.Write([]byte(strconv.FormatFloat(float64(gauge), 'g', -1, 64)))
-			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "text/plain charset=UTF-8")
 		case "counter":
 			counter, err := store.GetCounter(metricName)
 			if err != nil {
@@ -81,9 +80,8 @@ func GetMetricHandle(store *storage.MemStorage) http.HandlerFunc {
 				return
 			}
 
-			w.Header().Set("Content-Type", "text/plain charset=UTF-8")
 			w.Write([]byte(strconv.FormatInt(int64(counter), 10)))
-			w.WriteHeader(http.StatusOK)
+			w.Header().Set("Content-Type", "text/plain charset=UTF-8")
 		}
 	}
 }
