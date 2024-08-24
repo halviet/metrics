@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/halviet/metrics/internal/storage"
+	"github.com/halviet/metrics/internal/storage/models"
 	"html/template"
 	"net/http"
 	"strconv"
@@ -37,6 +39,32 @@ func MetricHandler(store *storage.MemStorage) http.HandlerFunc {
 
 			counter := storage.Counter(val)
 			store.UpdateCounter(metricName, counter)
+		default:
+			http.Error(w, "Provided type doesn't exist", http.StatusBadRequest)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func JSONMetricHandler(store *storage.MemStorage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		var body models.Metrics
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+		}
+
+		switch body.MType {
+		case "gauge":
+			gauge := storage.Gauge(*body.Value)
+			store.UpdateGauge(body.ID, gauge)
+		case "counter":
+			counter := storage.Counter(*body.Delta)
+			store.UpdateCounter(body.ID, counter)
 		default:
 			http.Error(w, "Provided type doesn't exist", http.StatusBadRequest)
 			return
@@ -82,6 +110,63 @@ func GetMetricHandle(store *storage.MemStorage) http.HandlerFunc {
 
 			w.Write([]byte(strconv.FormatInt(int64(counter), 10)))
 			w.Header().Set("Content-Type", "text/plain charset=UTF-8")
+		}
+	}
+}
+
+func JSONGetMetricHandle(store *storage.MemStorage) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+
+		var body models.Metrics
+		err := json.NewDecoder(r.Body).Decode(&body)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+		}
+
+		switch body.MType {
+		case "gauge":
+			gauge, err := store.GetGauge(body.ID)
+			if err != nil {
+				if errors.Is(err, storage.ErrMetricNotFound) {
+					http.NotFound(w, r)
+					return
+				}
+
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			err = json.NewEncoder(w).Encode(models.Metrics{
+				ID:    body.ID,
+				MType: body.MType,
+				Value: (*float64)(&gauge),
+			})
+			if err != nil {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		case "counter":
+			counter, err := store.GetCounter(body.ID)
+			if err != nil {
+				if errors.Is(err, storage.ErrMetricNotFound) {
+					http.NotFound(w, r)
+					return
+				}
+
+				http.Error(w, "Bad Request", http.StatusBadRequest)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			err = json.NewEncoder(w).Encode(models.Metrics{
+				ID:    body.ID,
+				MType: body.MType,
+				Delta: (*int64)(&counter),
+			})
+			if err != nil {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
 		}
 	}
 }

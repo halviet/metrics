@@ -1,12 +1,14 @@
 package agent
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/halviet/metrics/internal/storage"
+	"github.com/halviet/metrics/internal/storage/models"
 	"math/rand"
 	"net/http"
 	"runtime"
-	"strconv"
 	"time"
 )
 
@@ -31,38 +33,44 @@ func (a *Agent) Update() {
 
 func (a *Agent) Send() error {
 	baseURL := "http://" + a.SrvAddr + "/update/"
-	metrics := make(map[string]string)
+	metrics := make(map[string]float64)
 
-	metrics["Alloc"] = strconv.FormatUint(a.MemStats.Alloc, 10)
-	metrics["BuckHashSys"] = strconv.FormatUint(a.MemStats.BuckHashSys, 10)
-	metrics["Frees"] = strconv.FormatUint(a.MemStats.Frees, 10)
-	metrics["GCCPUFraction"] = strconv.FormatFloat(a.MemStats.GCCPUFraction, 'g', -1, 64)
-	metrics["GCSys"] = strconv.FormatUint(a.MemStats.GCSys, 10)
-	metrics["HeapAlloc"] = strconv.FormatUint(a.MemStats.HeapAlloc, 10)
-	metrics["HeapIdle"] = strconv.FormatUint(a.MemStats.HeapIdle, 10)
-	metrics["HeapInuse"] = strconv.FormatUint(a.MemStats.HeapInuse, 10)
-	metrics["HeapObjects"] = strconv.FormatUint(a.MemStats.HeapObjects, 10)
-	metrics["HeapReleased"] = strconv.FormatUint(a.MemStats.HeapReleased, 10)
-	metrics["HeapSys"] = strconv.FormatUint(a.MemStats.HeapSys, 10)
-	metrics["LastGC"] = strconv.FormatUint(a.MemStats.LastGC, 10)
-	metrics["Lookups"] = strconv.FormatUint(a.MemStats.Lookups, 10)
-	metrics["MCacheInuse"] = strconv.FormatUint(a.MemStats.MCacheInuse, 10)
-	metrics["MCacheSys"] = strconv.FormatUint(a.MemStats.MCacheSys, 10)
-	metrics["MSpanInuse"] = strconv.FormatUint(a.MemStats.MSpanInuse, 10)
-	metrics["MSpanSys"] = strconv.FormatUint(a.MemStats.MSpanSys, 10)
-	metrics["Mallocs"] = strconv.FormatUint(a.MemStats.Mallocs, 10)
-	metrics["NextGC"] = strconv.FormatUint(a.MemStats.NextGC, 10)
-	metrics["NumForcedGC"] = strconv.FormatUint(uint64(a.MemStats.NumForcedGC), 10)
-	metrics["NumGC"] = strconv.FormatUint(uint64(a.MemStats.NumGC), 10)
-	metrics["OtherSys"] = strconv.FormatUint(a.MemStats.OtherSys, 10)
-	metrics["PauseTotalNs"] = strconv.FormatUint(a.MemStats.PauseTotalNs, 10)
-	metrics["StackInuse"] = strconv.FormatUint(a.MemStats.StackInuse, 10)
-	metrics["StackSys"] = strconv.FormatUint(a.MemStats.StackSys, 10)
-	metrics["Sys"] = strconv.FormatUint(a.MemStats.Sys, 10)
-	metrics["TotalAlloc"] = strconv.FormatUint(a.MemStats.TotalAlloc, 10)
+	metrics["Alloc"] = float64(a.MemStats.Alloc)
+	metrics["BuckHashSys"] = float64(a.MemStats.BuckHashSys)
+	metrics["Frees"] = float64(a.MemStats.Frees)
+	metrics["GCCPUFraction"] = a.MemStats.GCCPUFraction
+	metrics["GCSys"] = float64(a.MemStats.GCSys)
+	metrics["HeapAlloc"] = float64(a.MemStats.HeapAlloc)
+	metrics["HeapIdle"] = float64(a.MemStats.HeapIdle)
+	metrics["HeapInuse"] = float64(a.MemStats.HeapInuse)
+	metrics["HeapObjects"] = float64(a.MemStats.HeapObjects)
+	metrics["HeapReleased"] = float64(a.MemStats.HeapReleased)
+	metrics["HeapSys"] = float64(a.MemStats.HeapSys)
+	metrics["LastGC"] = float64(a.MemStats.LastGC)
+	metrics["Lookups"] = float64(a.MemStats.Lookups)
+	metrics["MCacheInuse"] = float64(a.MemStats.MCacheInuse)
+	metrics["MCacheSys"] = float64(a.MemStats.MCacheSys)
+	metrics["MSpanInuse"] = float64(a.MemStats.MSpanInuse)
+	metrics["MSpanSys"] = float64(a.MemStats.MSpanSys)
+	metrics["Mallocs"] = float64(a.MemStats.Mallocs)
+	metrics["NextGC"] = float64(a.MemStats.NextGC)
+	metrics["NumForcedGC"] = float64(a.MemStats.NumForcedGC)
+	metrics["NumGC"] = float64(a.MemStats.NumGC)
+	metrics["OtherSys"] = float64(a.MemStats.OtherSys)
+	metrics["PauseTotalNs"] = float64(a.MemStats.PauseTotalNs)
+	metrics["StackInuse"] = float64(a.MemStats.StackInuse)
+	metrics["StackSys"] = float64(a.MemStats.StackSys)
+	metrics["Sys"] = float64(a.MemStats.Sys)
+	metrics["TotalAlloc"] = float64(a.MemStats.TotalAlloc)
 
-	sendMetric := func(metricType, name, v string) error {
-		resp, err := http.Post(baseURL+metricType+"/"+name+"/"+v, "text/plain", nil)
+	sendMetric := func(metric models.Metrics) error {
+		var body bytes.Buffer
+		err := json.NewEncoder(&body).Encode(metric)
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.Post(baseURL, "text/plain", &body)
 		if err != nil {
 			return err
 		}
@@ -79,17 +87,31 @@ func (a *Agent) Send() error {
 	}
 
 	for name, v := range metrics {
-		err := sendMetric("gauge", name, v)
+		err := sendMetric(models.Metrics{
+			ID:    name,
+			MType: "gauge",
+			Value: &v,
+		})
 		if err != nil {
 			return err
 		}
 	}
 
-	err := sendMetric("counter", "PollCount", strconv.FormatInt(a.PollCount, 10))
+	err := sendMetric(models.Metrics{
+		ID:    "PollCount",
+		MType: "counter",
+		Delta: &a.PollCount,
+	})
 	if err != nil {
 		return err
 	}
-	err = sendMetric("gauge", "RandomValue", strconv.FormatFloat(float64(a.RandomValue), 'g', -1, 64))
+
+	rv := float64(a.RandomValue)
+	err = sendMetric(models.Metrics{
+		ID:    "RandomValue",
+		MType: "gauge",
+		Value: &rv,
+	})
 	if err != nil {
 		return err
 	}
