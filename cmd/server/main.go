@@ -29,7 +29,7 @@ func main() {
 	r.Post("/update/", handlers.JSONMetricHandler(store))
 	r.Post("/update/{metricType}/{metricName}/{metricValue}", handlers.MetricHandler(store))
 
-	r.Get("/value/", handlers.JSONGetMetricHandle(store))
+	r.Post("/value/", handlers.JSONGetMetricHandle(store))
 	r.Get("/value/{metricType}/{metricName}", handlers.GetMetricHandle(store))
 	r.Get("/", handlers.GetAllMetricsPageHandler(store))
 

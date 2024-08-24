@@ -375,7 +375,7 @@ func TestJSONGetMetricHandle(t *testing.T) {
 	store.UpdateCounter("counterValue", storage.Counter(5))
 
 	r := chi.NewRouter()
-	r.Get("/value/", JSONGetMetricHandle(store))
+	r.Post("/value/", JSONGetMetricHandle(store))
 
 	ts := httptest.NewServer(r)
 	defer ts.Close()
@@ -385,7 +385,7 @@ func TestJSONGetMetricHandle(t *testing.T) {
 			var body bytes.Buffer
 			err := json.NewEncoder(&body).Encode(test.metric)
 
-			req, err := http.NewRequest(http.MethodGet, ts.URL+"/value/", &body)
+			req, err := http.NewRequest(http.MethodPost, ts.URL+"/value/", &body)
 			assert.NoError(t, err)
 
 			resp, err := ts.Client().Do(req)
