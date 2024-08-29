@@ -7,7 +7,8 @@ import (
 )
 
 type Config struct {
-	SrvAddr string `env:"ADDRESS"`
+	SrvAddr  string `env:"ADDRESS"`
+	LogLevel string `env:"LOG_LEVEL"`
 }
 
 func NewConfig() (Config, error) {
@@ -20,17 +21,22 @@ func NewConfig() (Config, error) {
 	if envs.SrvAddr != "" {
 		cfg.SrvAddr = envs.SrvAddr
 	}
+	if envs.LogLevel != "" {
+		cfg.LogLevel = envs.LogLevel
+	}
 
 	return cfg, nil
 }
 
 func parseFlags() Config {
 	srvAddr := flag.String("a", "localhost:8080", "address of a metrics server (addr:port)")
+	logLevel := flag.String("l", "info", "level of logging")
 
 	flag.Parse()
 
 	return Config{
-		SrvAddr: *srvAddr,
+		SrvAddr:  *srvAddr,
+		LogLevel: *logLevel,
 	}
 }
 
