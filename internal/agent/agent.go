@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/halviet/metrics/internal/storage"
@@ -64,13 +65,23 @@ func (a *Agent) Send() error {
 	metrics["TotalAlloc"] = float64(a.MemStats.TotalAlloc)
 
 	sendMetric := func(metric models.Metrics) error {
-		var body bytes.Buffer
-		err := json.NewEncoder(&body).Encode(metric)
+		body := bytes.NewBuffer(nil)
+		wBody := gzip.NewWriter(body)
+
+		err := json.NewEncoder(wBody).Encode(metric)
 		if err != nil {
 			return err
 		}
 
-		resp, err := http.Post(baseURL, "text/plain", &body)
+		wBody.Close()
+
+		r, err := http.NewRequest(http.MethodPost, baseURL, body)
+		if err != nil {
+			return err
+		}
+		r.Header.Set("Content-Encoding", "gzip")
+
+		resp, err := http.DefaultClient.Do(r)
 		if err != nil {
 			return err
 		}

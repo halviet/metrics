@@ -66,7 +66,7 @@ func JSONMetricHandler(store *storage.MemStorage) http.HandlerFunc {
 			counter := storage.Counter(*body.Delta)
 			store.UpdateCounter(body.ID, counter)
 		default:
-			http.Error(w, "Provided type doesn't exist", http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("Provided type (%s) doesn't exist", body.MType), http.StatusBadRequest)
 			return
 		}
 

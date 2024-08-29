@@ -25,6 +25,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Use(mw.Log(l))
+	r.Use(mw.GzipCompress)
 
 	r.Post("/update/", handlers.JSONMetricHandler(store))
 	r.Post("/update/{metricType}/{metricName}/{metricValue}", handlers.MetricHandler(store))
